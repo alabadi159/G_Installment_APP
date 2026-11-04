@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidExpense(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.amount is number && data.amount >= 0 &&
+             data.category is string &&
+             (!('date' in data) || data.date is number) &&
+             (!('isMonthlyRecurring' in data) || data.isMonthlyRecurring is bool) &&
+             (!('notes' in data) || data.notes is string) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp && data.createdAt <= request.time)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidInstallment(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.provider is string &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.monthsCount is int && data.monthsCount >= 1 &&
+             (!('monthlyAmount' in data) || data.monthlyAmount is number) &&
+             (!('startDate' in data) || data.startDate is number) &&
+             (!('paidMonthsCount' in data) || data.paidMonthsCount is int) &&
+             (!('status' in data) || data.status is string) &&
+             (!('notes' in data) || data.notes is string) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp && data.createdAt <= request.time)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidSavingsGoal(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.targetAmount is number && data.targetAmount >= 0 &&
+             (!('currentAmount' in data) || data.currentAmount is number) &&
+             (!('deadlineDate' in data) || data.deadlineDate is number) &&
+             (!('category' in data) || data.category is string) &&
+             (!('notes' in data) || data.notes is string) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp && data.createdAt <= request.time)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidIncome(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.amount is number && data.amount >= 0 &&
+             data.category is string &&
+             (!('receiptDate' in data) || data.receiptDate is number) &&
+             (!('isRecurringMonthly' in data) || data.isRecurringMonthly is bool) &&
+             (!('notes' in data) || data.notes is string) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp && data.createdAt <= request.time)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /expenses/{expenseId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidExpense(request.resource.data);
+      }
+
+      match /installments/{installmentId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidInstallment(request.resource.data);
+      }
+
+      match /savings_goals/{goalId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSavingsGoal(request.resource.data);
+      }
+
+      match /incomes/{incomeId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidIncome(request.resource.data);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

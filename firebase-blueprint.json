@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User metadata",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "User expense entry",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "number" },
+        "isMonthlyRecurring": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "amount", "category"]
+    },
+    "InstallmentPlan": {
+      "title": "InstallmentPlan",
+      "description": "User installment plan",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "provider": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "monthsCount": { "type": "integer" },
+        "monthlyAmount": { "type": "number" },
+        "startDate": { "type": "number" },
+        "paidMonthsCount": { "type": "integer" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "provider", "totalAmount", "monthsCount"]
+    },
+    "SavingsGoal": {
+      "title": "SavingsGoal",
+      "description": "User savings goal",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "deadlineDate": { "type": "number" },
+        "category": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "targetAmount"]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "User income entry",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "receiptDate": { "type": "number" },
+        "isRecurringMonthly": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "amount", "category"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile document"
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "User expense entries"
+    },
+    "/users/{userId}/installments/{installmentId}": {
+      "schema": { "$ref": "#/entities/InstallmentPlan" },
+      "description": "User installment plans"
+    },
+    "/users/{userId}/savings_goals/{goalId}": {
+      "schema": { "$ref": "#/entities/SavingsGoal" },
+      "description": "User savings goals"
+    },
+    "/users/{userId}/incomes/{incomeId}": {
+      "schema": { "$ref": "#/entities/Income" },
+      "description": "User income entries"
+    }
+  }
+}
