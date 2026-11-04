@@ -31,17 +31,29 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.ui.components.RechartsStyleMonthlyBarChart
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,9 +103,18 @@ fun DashboardScreen(
   val housing by viewModel.housing.collectAsState()
   val alerts by viewModel.alerts.collectAsState()
 
+  val monthlyBreakdown by viewModel.monthlyBreakdown.collectAsState()
+  val isFirestoreSource by viewModel.isFirestoreSource.collectAsState()
+  val authUser by viewModel.authUser.collectAsState()
+
   var showAddExpenseDialog by remember { mutableStateOf(false) }
   var showAddIncomeDialog by remember { mutableStateOf(false) }
   var showAddInstallmentDialog by remember { mutableStateOf(false) }
+  var showResetConfirmDialog by remember { mutableStateOf(false) }
+  var resetWipeCloud by remember { mutableStateOf(false) }
+
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
 
   val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale(language.code))
   val isSurplus = overview.netMonthlyCashflow >= 0
@@ -254,6 +275,91 @@ fun DashboardScreen(
               onClick = onNavigateToReports,
               modifier = Modifier.weight(1f)
             )
+          }
+        }
+      }
+
+      // Recharts-Style Interactive Monthly Breakdown Chart
+      item {
+        RechartsStyleMonthlyBarChart(
+          data = monthlyBreakdown,
+          language = language,
+          isFirestoreSource = isFirestoreSource,
+          onRefresh = { viewModel.refreshBreakdownFromFirestore() },
+          modifier = Modifier.testTag("monthly_breakdown_chart")
+        )
+      }
+
+      // Reset & Rebuild Database Action Card
+      item {
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("reset_rebuild_card"),
+          shape = RoundedCornerShape(20.dp),
+          colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+          )
+        ) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.weight(1f)
+            ) {
+              Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                modifier = Modifier.size(38.dp)
+              ) {
+                Box(contentAlignment = Alignment.Center) {
+                  Icon(
+                    imageVector = Icons.Default.RestartAlt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(22.dp)
+                  )
+                }
+              }
+              Spacer(modifier = Modifier.width(10.dp))
+              Column {
+                Text(
+                  text = AppStrings.get("reset_rebuild_db", language),
+                  style = MaterialTheme.typography.bodyMedium,
+                  fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                  text = AppStrings.get("reset_db_confirm_msg", language),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  maxLines = 1
+                )
+              }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Button(
+              onClick = { showResetConfirmDialog = true },
+              colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+              ),
+              shape = RoundedCornerShape(12.dp),
+              modifier = Modifier.testTag("reset_db_button")
+            ) {
+              Text(
+                text = AppStrings.get("reset_button_confirm", language),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onError
+              )
+            }
           }
         }
       }
@@ -427,6 +533,13 @@ fun DashboardScreen(
     ) {
       Icon(Icons.Default.Add, contentDescription = AppStrings.get("add_expense", language))
     }
+
+    SnackbarHost(
+      hostState = snackbarHostState,
+      modifier = Modifier
+        .align(Alignment.BottomCenter)
+        .padding(bottom = 80.dp)
+    )
   }
 
   if (showAddExpenseDialog) {
@@ -458,6 +571,93 @@ fun DashboardScreen(
       onConfirm = { t, p, tot, m, s, n, paid ->
         viewModel.addInstallment(t, p, tot, m, s, n, paid)
         showAddInstallmentDialog = false
+      }
+    )
+  }
+
+  if (showResetConfirmDialog) {
+    AlertDialog(
+      onDismissRequest = { showResetConfirmDialog = false },
+      icon = {
+        Icon(
+          imageVector = Icons.Default.DeleteSweep,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.error,
+          modifier = Modifier.size(32.dp)
+        )
+      },
+      title = {
+        Text(
+          text = AppStrings.get("reset_db_confirm_title", language),
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold
+        )
+      },
+      text = {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          Text(
+            text = AppStrings.get("reset_db_confirm_msg", language),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+
+          if (authUser != null) {
+            Surface(
+              shape = RoundedCornerShape(12.dp),
+              color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                  .clip(RoundedCornerShape(12.dp))
+                  .clickable { resetWipeCloud = !resetWipeCloud }
+                  .padding(horizontal = 12.dp, vertical = 10.dp)
+              ) {
+                Checkbox(
+                  checked = resetWipeCloud,
+                  onCheckedChange = { resetWipeCloud = it }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                  text = AppStrings.get("reset_include_cloud", language),
+                  style = MaterialTheme.typography.bodySmall,
+                  fontWeight = FontWeight.SemiBold,
+                  color = MaterialTheme.colorScheme.onSurface
+                )
+              }
+            }
+          }
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            showResetConfirmDialog = false
+            viewModel.resetAndRebuildDatabase(clearCloud = resetWipeCloud) { success, msg ->
+              scope.launch {
+                snackbarHostState.showSnackbar(
+                  if (success) AppStrings.get("reset_success", language) else msg
+                )
+              }
+            }
+          },
+          colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error
+          ),
+          shape = RoundedCornerShape(12.dp)
+        ) {
+          Text(
+            text = AppStrings.get("reset_button_confirm", language),
+            color = MaterialTheme.colorScheme.onError,
+            fontWeight = FontWeight.Bold
+          )
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showResetConfirmDialog = false }) {
+          Text(text = AppStrings.get("cancel", language))
+        }
       }
     )
   }

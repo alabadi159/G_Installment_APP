@@ -16,6 +16,7 @@ import com.example.data.local.entity.SavingsGoalEntity
 import com.example.data.local.entity.TelecomContractEntity
 import com.example.data.remote.GoldRates
 import com.example.data.repository.FinanceRepository
+import com.example.ui.components.MonthBreakdownItem
 import com.example.ui.localization.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -573,6 +574,82 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         onComplete(true, "تم تنزيل وتحديث $count سجل من Firebase بنجاح")
       } else {
         onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "حدث خطأ أثناء الاسترجاع")
+      }
+    }
+  }
+
+  // ----------------------------------------------------
+  // Monthly Breakdown State (Expenses, Installments, Savings)
+  // ----------------------------------------------------
+
+  private val _firestoreMonthlyBreakdown = MutableStateFlow<List<MonthBreakdownItem>?>(null)
+
+  private val _isFirestoreSource = MutableStateFlow(false)
+  val isFirestoreSource: StateFlow<Boolean> = _isFirestoreSource.asStateFlow()
+
+  val monthlyBreakdown: StateFlow<List<MonthBreakdownItem>> = combine(
+    expenses, installments, savingsGoals, _currentLanguage, _firestoreMonthlyBreakdown
+  ) { args: Array<Any?> ->
+    @Suppress("UNCHECKED_CAST")
+    val expList = args[0] as List<ExpenseEntity>
+    @Suppress("UNCHECKED_CAST")
+    val instList = args[1] as List<InstallmentPlanEntity>
+    @Suppress("UNCHECKED_CAST")
+    val savList = args[2] as List<SavingsGoalEntity>
+    val lang = args[3] as AppLanguage
+    @Suppress("UNCHECKED_CAST")
+    val firestoreData = args[4] as? List<MonthBreakdownItem>
+
+    if (firestoreData != null && _isFirestoreSource.value) {
+      firestoreData
+    } else {
+      repository.generateMonthlyBreakdown(
+        expenses = expList,
+        installments = instList,
+        savingsGoals = savList,
+        isArabic = lang == AppLanguage.ARABIC
+      )
+    }
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  fun refreshBreakdownFromFirestore() {
+    val uid = authManager.currentUser?.uid
+    if (uid.isNullOrBlank()) {
+      _isFirestoreSource.value = false
+      _firestoreMonthlyBreakdown.value = null
+      return
+    }
+    viewModelScope.launch {
+      _isCloudSyncing.value = true
+      val res = repository.fetchFirestoreMonthlyBreakdown(uid, _currentLanguage.value == AppLanguage.ARABIC)
+      _isCloudSyncing.value = false
+      if (res.isSuccess) {
+        val list = res.getOrDefault(emptyList())
+        _firestoreMonthlyBreakdown.value = list
+        _isFirestoreSource.value = true
+      } else {
+        _isFirestoreSource.value = false
+        _firestoreMonthlyBreakdown.value = null
+      }
+    }
+  }
+
+  // ----------------------------------------------------
+  // Reset and Rebuild Local Database
+  // ----------------------------------------------------
+
+  fun resetAndRebuildDatabase(clearCloud: Boolean, onComplete: (Boolean, String) -> Unit) {
+    viewModelScope.launch {
+      _isSyncing.value = true
+      val uid = authManager.currentUser?.uid
+      val res = repository.resetAndRebuildDatabase(clearCloud = clearCloud, userId = uid)
+      _isSyncing.value = false
+      if (res.isSuccess) {
+        _firestoreMonthlyBreakdown.value = null
+        _isFirestoreSource.value = false
+        onComplete(true, "تمت إعادة ضبط وبناء قاعدة البيانات بنجاح")
+      } else {
+        onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "فشلت إعادة الضبط")
       }
     }
   }

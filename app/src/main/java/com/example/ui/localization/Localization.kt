@@ -282,7 +282,25 @@ object AppStrings {
       "category_bills" to "فواتير وخدمات",
       "category_health" to "صحة وعلاج",
       "category_entertainment" to "ترفيه ومطاعم",
-      "category_other" to "أخرى"
+      "category_other" to "أخرى",
+      "monthly_breakdown_title" to "التحليل والمقارنة الشهرية",
+      "monthly_breakdown_subtitle" to "مقارنة حية للمصروفات والأقساط والادخار",
+      "recharts_style_chart" to "رسم بياني تفاعلي (نمط Recharts)",
+      "reset_rebuild_db" to "إعادة ضبط وبناء قاعدة البيانات",
+      "reset_db_confirm_title" to "تأكيد إعادة تعيين قاعدة البيانات",
+      "reset_db_confirm_msg" to "سيتم مسح جميع المصروفات، الأقساط، والمدخرات وإعادة بناء قاعدة البيانات المحلية لتكون فارغة وجديدة تماماً.",
+      "reset_include_cloud" to "مسح البيانات السحابية في Firebase أيضاً",
+      "reset_button_confirm" to "إعادة التعيين الآن",
+      "reset_success" to "تمت إعادة ضبط وبناء قاعدة البيانات بنجاح",
+      "fetching_firestore" to "جاري تحديث البيانات من Firestore...",
+      "source_firestore" to "مباشر من Firebase Firestore",
+      "source_local" to "قاعدة البيانات المحلية (Room)",
+      "savings_legend" to "الادخار",
+      "installments_legend" to "الأقساط",
+      "expenses_legend" to "المصروفات",
+      "refresh_data" to "تحديث",
+      "no_breakdown_data" to "لا توجد حركات مسجلة لهذا الشهر",
+      "select_month" to "اختر الشهر للتفاصيل"
     )
 
     val en = mapOf(
@@ -560,7 +578,25 @@ object AppStrings {
       "category_bills" to "Bills & Utilities",
       "category_health" to "Healthcare",
       "category_entertainment" to "Dining & Entertainment",
-      "category_other" to "Other"
+      "category_other" to "Other",
+      "monthly_breakdown_title" to "Monthly Breakdown & Comparison",
+      "monthly_breakdown_subtitle" to "Live comparison of Expenses, Installments & Savings",
+      "recharts_style_chart" to "Interactive Analytics Chart (Recharts Style)",
+      "reset_rebuild_db" to "Reset & Rebuild Database",
+      "reset_db_confirm_title" to "Confirm Database Reset",
+      "reset_db_confirm_msg" to "This will clear all local expenses, installments, and savings, rebuilding a clean, empty database as on first install.",
+      "reset_include_cloud" to "Also clear cloud records in Firebase",
+      "reset_button_confirm" to "Reset & Rebuild Now",
+      "reset_success" to "Database reset and rebuilt successfully",
+      "fetching_firestore" to "Updating data from Firestore...",
+      "source_firestore" to "Live from Firebase Firestore",
+      "source_local" to "Local Database (Room)",
+      "savings_legend" to "Savings",
+      "installments_legend" to "Installments",
+      "expenses_legend" to "Expenses",
+      "refresh_data" to "Refresh",
+      "no_breakdown_data" to "No records found for this month",
+      "select_month" to "Tap any month column for details"
     )
 
     val dict = if (language == AppLanguage.ARABIC) ar else en

@@ -486,4 +486,16 @@ class FirestoreManager(private val db: FirebaseFirestore) {
       incomes = incomes
     )
   }
+
+  suspend fun clearAllUserData(userId: String): Result<Unit> = runCatching {
+    require(userId.isNotBlank()) { "User ID cannot be blank" }
+    val collections = listOf("expenses", "installments", "savings_goals", "incomes")
+    for (coll in collections) {
+      val colRef = db.collection("users").document(userId).collection(coll)
+      val snapshot = colRef.get().await()
+      for (doc in snapshot.documents) {
+        doc.reference.delete().await()
+      }
+    }
+  }
 }

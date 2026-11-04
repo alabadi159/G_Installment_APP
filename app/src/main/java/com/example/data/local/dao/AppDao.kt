@@ -156,4 +156,18 @@ interface AppDao {
 
   @Query("DELETE FROM housing_expenses")
   suspend fun deleteHousing()
+
+  @androidx.room.Transaction
+  suspend fun clearAllData() {
+    deleteAllExpenses()
+    deleteAllIncomes()
+    deleteAllAlerts()
+    deleteAllInstallments()
+    deleteCarLoan()
+    deleteAllCarServices()
+    deleteAllGoldHoldings()
+    deleteAllSavingsGoals()
+    deleteAllTelecomContracts()
+    deleteHousing()
+  }
 }

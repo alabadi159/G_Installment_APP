@@ -18,7 +18,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 import com.example.data.remote.FirestoreManager
+import com.example.ui.components.MonthBreakdownItem
 import kotlinx.coroutines.flow.first
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class FinanceRepository(
   private val appDao: AppDao,
@@ -421,6 +425,94 @@ class FinanceRepository(
   suspend fun deleteIncomeFromCloud(userId: String?, incomeId: Long) {
     if (userId.isNullOrBlank() || firestoreManager == null) return
     firestoreManager.deleteIncome(userId, incomeId)
+  }
+
+  suspend fun resetAndRebuildDatabase(clearCloud: Boolean = false, userId: String? = null): Result<Unit> = runCatching {
+    appDao.clearAllData()
+    if (clearCloud && !userId.isNullOrBlank() && firestoreManager != null) {
+      firestoreManager.clearAllUserData(userId)
+    }
+  }
+
+  suspend fun fetchFirestoreMonthlyBreakdown(userId: String, isArabic: Boolean): Result<List<MonthBreakdownItem>> = runCatching {
+    val fm = firestoreManager ?: return@runCatching emptyList()
+    val expensesRes = fm.fetchExpenses(userId).getOrDefault(emptyList())
+    val installmentsRes = fm.fetchInstallments(userId).getOrDefault(emptyList())
+    val savingsRes = fm.fetchSavingsGoals(userId).getOrDefault(emptyList())
+
+    generateMonthlyBreakdown(
+      expenses = expensesRes,
+      installments = installmentsRes,
+      savingsGoals = savingsRes,
+      isArabic = isArabic
+    )
+  }
+
+  fun generateMonthlyBreakdown(
+    expenses: List<ExpenseEntity>,
+    installments: List<InstallmentPlanEntity>,
+    savingsGoals: List<SavingsGoalEntity>,
+    isArabic: Boolean
+  ): List<MonthBreakdownItem> {
+    val locale = if (isArabic) Locale("ar") else Locale.ENGLISH
+    val monthFormat = SimpleDateFormat("MMM", locale)
+    val keyFormat = SimpleDateFormat("yyyy-MM", Locale.ENGLISH)
+
+    val result = mutableListOf<MonthBreakdownItem>()
+
+    // Generate last 6 months (5 months ago up to current month)
+    val monthKeys = mutableListOf<Triple<String, String, LongRange>>()
+    for (i in 5 downTo 0) {
+      val c = Calendar.getInstance()
+      c.add(Calendar.MONTH, -i)
+      c.set(Calendar.DAY_OF_MONTH, 1)
+      c.set(Calendar.HOUR_OF_DAY, 0)
+      c.set(Calendar.MINUTE, 0)
+      c.set(Calendar.SECOND, 0)
+      c.set(Calendar.MILLISECOND, 0)
+      val startMs = c.timeInMillis
+
+      c.set(Calendar.DAY_OF_MONTH, c.getActualMaximum(Calendar.DAY_OF_MONTH))
+      c.set(Calendar.HOUR_OF_DAY, 23)
+      c.set(Calendar.MINUTE, 59)
+      c.set(Calendar.SECOND, 59)
+      val endMs = c.timeInMillis
+
+      val label = monthFormat.format(c.time)
+      val key = keyFormat.format(c.time)
+      monthKeys.add(Triple(key, label, startMs..endMs))
+    }
+
+    val totalSavingsAccumulated = savingsGoals.sumOf { it.currentAmount }
+    val avgMonthlySavings = if (savingsGoals.isNotEmpty()) totalSavingsAccumulated / 6.0 else 0.0
+
+    for ((key, label, range) in monthKeys) {
+      val monthExpenses = expenses.filter { it.date in range }.sumOf { it.amount }
+      val monthInstallments = installments.filter { plan ->
+        val planStart = plan.startDate
+        if (planStart <= range.last) {
+          val planCal = Calendar.getInstance().apply { timeInMillis = planStart }
+          val targetCal = Calendar.getInstance().apply { timeInMillis = range.first }
+          val diffMonths = (targetCal.get(Calendar.YEAR) - planCal.get(Calendar.YEAR)) * 12 +
+            (targetCal.get(Calendar.MONTH) - planCal.get(Calendar.MONTH))
+          diffMonths in 0 until plan.monthsCount
+        } else false
+      }.sumOf { it.monthlyAmount }
+
+      val monthSavings = if (avgMonthlySavings > 0) avgMonthlySavings else 0.0
+
+      result.add(
+        MonthBreakdownItem(
+          monthKey = key,
+          monthLabel = label,
+          expenses = Math.round(monthExpenses * 100.0) / 100.0,
+          installments = Math.round(monthInstallments * 100.0) / 100.0,
+          savings = Math.round(monthSavings * 100.0) / 100.0
+        )
+      )
+    }
+
+    return result
   }
 }
 
