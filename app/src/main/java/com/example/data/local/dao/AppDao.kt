@@ -14,6 +14,8 @@ import com.example.data.local.entity.GoldHoldingEntity
 import com.example.data.local.entity.HousingEntity
 import com.example.data.local.entity.IncomeEntity
 import com.example.data.local.entity.InstallmentPlanEntity
+import com.example.data.local.entity.MonthlyBudgetEntity
+import com.example.data.local.entity.RentalContractEntity
 import com.example.data.local.entity.SavingsGoalEntity
 import com.example.data.local.entity.TelecomContractEntity
 import kotlinx.coroutines.flow.Flow
@@ -157,6 +159,32 @@ interface AppDao {
   @Query("DELETE FROM housing_expenses")
   suspend fun deleteHousing()
 
+  // Rental Contracts (Houses, Stores, Cars, Places)
+  @Query("SELECT * FROM rental_contracts ORDER BY id DESC")
+  fun getAllRentals(): Flow<List<RentalContractEntity>>
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun insertRental(rental: RentalContractEntity): Long
+
+  @Update
+  suspend fun updateRental(rental: RentalContractEntity)
+
+  @Delete
+  suspend fun deleteRental(rental: RentalContractEntity)
+
+  @Query("DELETE FROM rental_contracts")
+  suspend fun deleteAllRentals()
+
+  // Monthly Spending Budget Goal
+  @Query("SELECT * FROM monthly_budget WHERE id = 1 LIMIT 1")
+  fun getMonthlyBudget(): Flow<MonthlyBudgetEntity?>
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun saveMonthlyBudget(budget: MonthlyBudgetEntity)
+
+  @Query("DELETE FROM monthly_budget")
+  suspend fun deleteMonthlyBudget()
+
   @androidx.room.Transaction
   suspend fun clearAllData() {
     deleteAllExpenses()
@@ -169,5 +197,7 @@ interface AppDao {
     deleteAllSavingsGoals()
     deleteAllTelecomContracts()
     deleteHousing()
+    deleteAllRentals()
+    deleteMonthlyBudget()
   }
 }

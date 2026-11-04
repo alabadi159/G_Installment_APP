@@ -867,20 +867,20 @@ fun EditCarLoanDialog(
     balloonTermMonths: Int
   ) -> Unit
 ) {
-  var carName by remember { mutableStateOf(currentCar?.carName ?: "Toyota Camry 2024") }
-  var totalPriceStr by remember { mutableStateOf(currentCar?.totalCarPrice?.toString() ?: "125000") }
-  var downPaymentStr by remember { mutableStateOf(currentCar?.downPayment?.toString() ?: "15000") }
+  var carName by remember { mutableStateOf(currentCar?.carName ?: "") }
+  var totalPriceStr by remember { mutableStateOf(currentCar?.totalCarPrice?.let { if (it > 0) it.toString() else "" } ?: "") }
+  var downPaymentStr by remember { mutableStateOf(currentCar?.downPayment?.let { if (it > 0) it.toString() else "" } ?: "") }
   var termMonths by remember { mutableIntStateOf(currentCar?.termMonths ?: 60) }
-  var profitRateStr by remember { mutableStateOf(currentCar?.annualProfitRate?.toString() ?: "3.65") }
-  var balloonPaymentStr by remember { mutableStateOf(currentCar?.balloonPayment?.toString() ?: "37500") }
-  var paidMonths by remember { mutableIntStateOf(currentCar?.paidMonths ?: 12) }
+  var profitRateStr by remember { mutableStateOf(currentCar?.annualProfitRate?.let { if (it > 0) it.toString() else "" } ?: "") }
+  var balloonPaymentStr by remember { mutableStateOf(currentCar?.balloonPayment?.let { if (it > 0) it.toString() else "" } ?: "") }
+  var paidMonths by remember { mutableIntStateOf(currentCar?.paidMonths ?: 0) }
 
   // Start Date / Month & Year
   var startMonth by remember { mutableIntStateOf(getMonthFromTimestamp(currentCar?.startDate ?: System.currentTimeMillis())) }
   var startYear by remember { mutableIntStateOf(getYearFromTimestamp(currentCar?.startDate ?: System.currentTimeMillis())) }
 
   // Balloon refinancing options per user request
-  var balloonRefinanced by remember { mutableStateOf(currentCar?.balloonRefinanced ?: true) }
+  var balloonRefinanced by remember { mutableStateOf(currentCar?.balloonRefinanced ?: false) }
   var balloonBankName by remember { mutableStateOf(currentCar?.balloonBankName ?: "Al Rajhi Bank") }
   var balloonTermMonths by remember { mutableIntStateOf(currentCar?.balloonTermMonths ?: 24) }
 
@@ -911,7 +911,7 @@ fun EditCarLoanDialog(
     onDismissRequest = onDismiss,
     title = {
       Text(
-        text = AppStrings.get("edit_car_loan", language),
+        text = if (currentCar == null) AppStrings.get("add_car_plan", language) else AppStrings.get("edit_car_loan", language),
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold
       )
@@ -2019,6 +2019,255 @@ fun AddCustomAlertDialog(
           }
         },
         modifier = Modifier.testTag("save_alert_button")
+      ) {
+        Text(AppStrings.get("save", language))
+      }
+    },
+    dismissButton = {
+      OutlinedButton(onClick = onDismiss) {
+        Text(AppStrings.get("cancel", language))
+      }
+    }
+  )
+}
+
+@Composable
+fun SetBudgetGoalDialog(
+  currentGoal: Double,
+  language: AppLanguage,
+  onDismiss: () -> Unit,
+  onConfirm: (Double) -> Unit
+) {
+  var goalText by remember { mutableStateOf(if (currentGoal > 0) currentGoal.toString() else "") }
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = {
+      Text(
+        text = AppStrings.get("monthly_budget_goal", language),
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold
+      )
+    },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+          text = AppStrings.get("budget_goal_desc", language),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedTextField(
+          value = goalText,
+          onValueChange = { goalText = it },
+          label = { Text(AppStrings.get("enter_budget_amount", language)) },
+          modifier = Modifier.fillMaxWidth().testTag("budget_goal_input"),
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+          ),
+          singleLine = true
+        )
+      }
+    },
+    confirmButton = {
+      Button(
+        onClick = {
+          val amt = goalText.toDoubleOrNull() ?: 0.0
+          onConfirm(amt)
+        },
+        modifier = Modifier.testTag("save_budget_button")
+      ) {
+        Text(AppStrings.get("save_budget", language))
+      }
+    },
+    dismissButton = {
+      OutlinedButton(onClick = onDismiss) {
+        Text(AppStrings.get("cancel", language))
+      }
+    }
+  )
+}
+
+@Composable
+fun AddRentalDialog(
+  language: AppLanguage,
+  onDismiss: () -> Unit,
+  onConfirm: (
+    title: String,
+    type: String,
+    amount: Double,
+    freq: String,
+    waterIncluded: Boolean,
+    elecIncluded: Boolean,
+    durationMonths: Int,
+    locationOrPlate: String,
+    notes: String
+  ) -> Unit
+) {
+  var title by remember { mutableStateOf("") }
+  var rentalType by remember { mutableStateOf("HOUSE") } // HOUSE, STORE, CAR, PLACE
+  var amountStr by remember { mutableStateOf("") }
+  var paymentFreq by remember { mutableStateOf("MONTHLY") } // MONTHLY, QUARTERLY, ANNUAL
+  var waterIncluded by remember { mutableStateOf(false) }
+  var elecIncluded by remember { mutableStateOf(false) }
+  var durationMonthsStr by remember { mutableStateOf("12") }
+  var locationOrPlate by remember { mutableStateOf("") }
+  var notes by remember { mutableStateOf("") }
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = {
+      Text(
+        text = AppStrings.get("add_rental", language),
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold
+      )
+    },
+    text = {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+      ) {
+        // Rental Type Chips
+        Text(text = AppStrings.get("category", language), style = MaterialTheme.typography.labelMedium)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          FilterChip(
+            selected = rentalType == "HOUSE",
+            onClick = { rentalType = "HOUSE" },
+            label = { Text(AppStrings.get("rental_type_house", language), fontSize = 11.sp) }
+          )
+          FilterChip(
+            selected = rentalType == "STORE",
+            onClick = { rentalType = "STORE" },
+            label = { Text(AppStrings.get("rental_type_store", language), fontSize = 11.sp) }
+          )
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          FilterChip(
+            selected = rentalType == "CAR",
+            onClick = { rentalType = "CAR" },
+            label = { Text(AppStrings.get("rental_type_car", language), fontSize = 11.sp) }
+          )
+          FilterChip(
+            selected = rentalType == "PLACE",
+            onClick = { rentalType = "PLACE" },
+            label = { Text(AppStrings.get("rental_type_place", language), fontSize = 11.sp) }
+          )
+        }
+
+        OutlinedTextField(
+          value = title,
+          onValueChange = { title = it },
+          label = {
+            Text(
+              when (rentalType) {
+                "HOUSE" -> if (language == AppLanguage.ARABIC) "اسم العقار / الشقة" else "House / Apartment Name"
+                "STORE" -> if (language == AppLanguage.ARABIC) "اسم المحل / المتجر" else "Store / Shop Name"
+                "CAR" -> if (language == AppLanguage.ARABIC) "موديل واسم السيارة" else "Car Model & Make"
+                else -> if (language == AppLanguage.ARABIC) "اسم المكان / المستودع" else "Place / Storage Name"
+              }
+            )
+          },
+          modifier = Modifier.fillMaxWidth().testTag("rental_title_input"),
+          singleLine = true
+        )
+
+        OutlinedTextField(
+          value = amountStr,
+          onValueChange = { amountStr = it },
+          label = { Text("${AppStrings.get("amount", language)} (${AppStrings.get("currency", language)})") },
+          modifier = Modifier.fillMaxWidth().testTag("rental_amount_input"),
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+          ),
+          singleLine = true
+        )
+
+        // Payment Cycle
+        Text(text = if (language == AppLanguage.ARABIC) "دورة السداد" else "Payment Cycle", style = MaterialTheme.typography.labelMedium)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          FilterChip(
+            selected = paymentFreq == "MONTHLY",
+            onClick = { paymentFreq = "MONTHLY" },
+            label = { Text(if (language == AppLanguage.ARABIC) "شهري" else "Monthly", fontSize = 11.sp) }
+          )
+          FilterChip(
+            selected = paymentFreq == "QUARTERLY",
+            onClick = { paymentFreq = "QUARTERLY" },
+            label = { Text(if (language == AppLanguage.ARABIC) "ربع سنوي (3 أشهر)" else "Quarterly", fontSize = 11.sp) }
+          )
+          FilterChip(
+            selected = paymentFreq == "ANNUAL",
+            onClick = { paymentFreq = "ANNUAL" },
+            label = { Text(if (language == AppLanguage.ARABIC) "سنوي" else "Annual", fontSize = 11.sp) }
+          )
+        }
+
+        if (rentalType == "HOUSE" || rentalType == "STORE" || rentalType == "PLACE") {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().clickable { waterIncluded = !waterIncluded }
+          ) {
+            Checkbox(checked = waterIncluded, onCheckedChange = { waterIncluded = it })
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = AppStrings.get("water_included", language), style = MaterialTheme.typography.bodySmall)
+          }
+
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().clickable { elecIncluded = !elecIncluded }
+          ) {
+            Checkbox(checked = elecIncluded, onCheckedChange = { elecIncluded = it })
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = AppStrings.get("electricity_included", language), style = MaterialTheme.typography.bodySmall)
+          }
+        }
+
+        OutlinedTextField(
+          value = locationOrPlate,
+          onValueChange = { locationOrPlate = it },
+          label = { Text(AppStrings.get("location_or_plate", language)) },
+          modifier = Modifier.fillMaxWidth(),
+          singleLine = true
+        )
+
+        OutlinedTextField(
+          value = durationMonthsStr,
+          onValueChange = { durationMonthsStr = it },
+          label = { Text(if (language == AppLanguage.ARABIC) "مدة العقد (بالأشهر)" else "Contract Duration (Months)") },
+          modifier = Modifier.fillMaxWidth(),
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+          ),
+          singleLine = true
+        )
+
+        OutlinedTextField(
+          value = notes,
+          onValueChange = { notes = it },
+          label = { Text(AppStrings.get("notes", language)) },
+          modifier = Modifier.fillMaxWidth(),
+          maxLines = 2
+        )
+      }
+    },
+    confirmButton = {
+      Button(
+        onClick = {
+          val amt = amountStr.toDoubleOrNull() ?: 0.0
+          val dur = durationMonthsStr.toIntOrNull() ?: 12
+          if (title.isNotBlank() && amt > 0) {
+            onConfirm(title, rentalType, amt, paymentFreq, waterIncluded, elecIncluded, dur, locationOrPlate, notes)
+          }
+        },
+        modifier = Modifier.testTag("save_rental_button")
       ) {
         Text(AppStrings.get("save", language))
       }

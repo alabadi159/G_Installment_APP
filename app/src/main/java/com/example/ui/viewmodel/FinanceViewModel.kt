@@ -12,6 +12,8 @@ import com.example.data.local.entity.GoldHoldingEntity
 import com.example.data.local.entity.HousingEntity
 import com.example.data.local.entity.IncomeEntity
 import com.example.data.local.entity.InstallmentPlanEntity
+import com.example.data.local.entity.MonthlyBudgetEntity
+import com.example.data.local.entity.RentalContractEntity
 import com.example.data.local.entity.SavingsGoalEntity
 import com.example.data.local.entity.TelecomContractEntity
 import com.example.data.remote.GoldRates
@@ -30,6 +32,20 @@ import android.content.Context
 import com.example.data.remote.AuthManager
 import com.example.data.remote.FirestoreManager
 import com.google.firebase.auth.FirebaseUser
+
+enum class BudgetStatus {
+  SAFE,
+  WARNING_80,
+  EXCEEDED_100
+}
+
+data class BudgetTrackingState(
+  val goalAmount: Double = 0.0,
+  val spentAmount: Double = 0.0,
+  val remainingAmount: Double = 0.0,
+  val percentage: Float = 0f,
+  val status: BudgetStatus = BudgetStatus.SAFE
+)
 
 data class FinancialOverview(
   val totalMonthlyIncome: Double,
@@ -112,6 +128,53 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
   val housing = repository.housing.stateIn(
     viewModelScope, SharingStarted.WhileSubscribed(5000), null
   )
+
+  val rentals = repository.allRentals.stateIn(
+    viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+  )
+
+  val monthlyBudget = repository.monthlyBudget.stateIn(
+    viewModelScope, SharingStarted.WhileSubscribed(5000), null
+  )
+
+  val budgetTracking: StateFlow<BudgetTrackingState> = combine(
+    monthlyBudget, expenses
+  ) { budget, expenseList ->
+    val goal = budget?.targetAmount ?: 0.0
+    val c = java.util.Calendar.getInstance()
+    val currentMonth = c.get(java.util.Calendar.MONTH)
+    val currentYear = c.get(java.util.Calendar.YEAR)
+
+    val currentMonthSpent = expenseList.filter { exp ->
+      val expCal = java.util.Calendar.getInstance().apply { timeInMillis = exp.date }
+      expCal.get(java.util.Calendar.MONTH) == currentMonth && expCal.get(java.util.Calendar.YEAR) == currentYear
+    }.sumOf { it.amount }
+
+    if (goal <= 0.0) {
+      BudgetTrackingState(
+        goalAmount = 0.0,
+        spentAmount = currentMonthSpent,
+        remainingAmount = 0.0,
+        percentage = 0f,
+        status = BudgetStatus.SAFE
+      )
+    } else {
+      val ratio = (currentMonthSpent / goal).toFloat()
+      val status = when {
+        ratio >= 1.0f -> BudgetStatus.EXCEEDED_100
+        ratio >= 0.8f -> BudgetStatus.WARNING_80
+        else -> BudgetStatus.SAFE
+      }
+      val remaining = (goal - currentMonthSpent).coerceAtLeast(0.0)
+      BudgetTrackingState(
+        goalAmount = goal,
+        spentAmount = currentMonthSpent,
+        remainingAmount = remaining,
+        percentage = ratio.coerceIn(0f, 1f),
+        status = status
+      )
+    }
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BudgetTrackingState())
 
   val goldRates: StateFlow<GoldRates> = repository.goldRates
 
@@ -651,6 +714,71 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
       } else {
         onComplete(false, res.exceptionOrNull()?.localizedMessage ?: "فشلت إعادة الضبط")
       }
+    }
+  }
+
+  // ----------------------------------------------------
+  // Budget Goal Management
+  // ----------------------------------------------------
+
+  fun updateBudgetGoal(goal: Double) {
+    viewModelScope.launch {
+      repository.saveMonthlyBudget(
+        MonthlyBudgetEntity(id = 1, targetAmount = goal, warningThresholdPercent = 80, isAlertEnabled = true)
+      )
+    }
+  }
+
+  // ----------------------------------------------------
+  // Car Loan Deletion & Reset
+  // ----------------------------------------------------
+
+  fun deleteCarLoan(onComplete: (() -> Unit)? = null) {
+    viewModelScope.launch {
+      val uid = authManager.currentUser?.uid
+      repository.deleteCarLoan(uid)
+      onComplete?.invoke()
+    }
+  }
+
+  // ----------------------------------------------------
+  // Multi-Rental Management
+  // ----------------------------------------------------
+
+  fun addRental(
+    title: String,
+    type: String,
+    amount: Double,
+    freq: String = "MONTHLY",
+    waterIncluded: Boolean = false,
+    elecIncluded: Boolean = false,
+    durationMonths: Int = 12,
+    locationOrPlate: String = "",
+    notes: String = ""
+  ) {
+    viewModelScope.launch {
+      val uid = authManager.currentUser?.uid
+      repository.addRental(
+        RentalContractEntity(
+          title = title,
+          rentalType = type,
+          rentAmount = amount,
+          paymentFrequency = freq,
+          isWaterIncluded = waterIncluded,
+          isElectricityIncluded = elecIncluded,
+          durationMonths = durationMonths,
+          locationOrPlate = locationOrPlate,
+          notes = notes
+        ),
+        userId = uid
+      )
+    }
+  }
+
+  fun deleteRental(rental: RentalContractEntity) {
+    viewModelScope.launch {
+      val uid = authManager.currentUser?.uid
+      repository.deleteRental(rental, userId = uid)
     }
   }
 }

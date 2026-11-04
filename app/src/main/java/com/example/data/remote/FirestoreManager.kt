@@ -5,6 +5,8 @@ import com.example.R
 import com.example.data.local.entity.ExpenseEntity
 import com.example.data.local.entity.IncomeEntity
 import com.example.data.local.entity.InstallmentPlanEntity
+import com.example.data.local.entity.MonthlyBudgetEntity
+import com.example.data.local.entity.RentalContractEntity
 import com.example.data.local.entity.SavingsGoalEntity
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -18,7 +20,9 @@ data class CloudSyncPayload(
   val expenses: List<ExpenseEntity> = emptyList(),
   val installments: List<InstallmentPlanEntity> = emptyList(),
   val savingsGoals: List<SavingsGoalEntity> = emptyList(),
-  val incomes: List<IncomeEntity> = emptyList()
+  val incomes: List<IncomeEntity> = emptyList(),
+  val rentals: List<RentalContractEntity> = emptyList(),
+  val budgetGoal: Double? = null
 )
 
 class FirestoreManager(private val db: FirebaseFirestore) {
@@ -478,18 +482,88 @@ class FirestoreManager(private val db: FirebaseFirestore) {
     val installments = fetchInstallments(userId).getOrDefault(emptyList())
     val savings = fetchSavingsGoals(userId).getOrDefault(emptyList())
     val incomes = fetchIncomes(userId).getOrDefault(emptyList())
+    val rentals = fetchRentals(userId).getOrDefault(emptyList())
 
     CloudSyncPayload(
       expenses = expenses,
       installments = installments,
       savingsGoals = savings,
-      incomes = incomes
+      incomes = incomes,
+      rentals = rentals
     )
+  }
+
+  suspend fun saveRental(userId: String, rental: RentalContractEntity): Result<Unit> = runCatching {
+    require(userId.isNotBlank()) { "User ID cannot be blank" }
+    val docId = if (rental.id > 0) rental.id.toString() else System.currentTimeMillis().toString()
+    val docRef = db.collection("users").document(userId).collection("rentals").document(docId)
+    val data = hashMapOf<String, Any>(
+      "title" to rental.title,
+      "rentalType" to rental.rentalType,
+      "rentAmount" to rental.rentAmount,
+      "paymentFrequency" to rental.paymentFrequency,
+      "isWaterIncluded" to rental.isWaterIncluded,
+      "isElectricityIncluded" to rental.isElectricityIncluded,
+      "startDate" to rental.startDate,
+      "durationMonths" to rental.durationMonths,
+      "paidMonths" to rental.paidMonths,
+      "nextDueDate" to rental.nextDueDate,
+      "locationOrPlate" to rental.locationOrPlate,
+      "notes" to rental.notes,
+      "updatedAt" to FieldValue.serverTimestamp()
+    )
+    docRef.set(data, SetOptions.merge()).await()
+  }
+
+  suspend fun deleteRental(userId: String, rentalId: Long): Result<Unit> = runCatching {
+    require(userId.isNotBlank()) { "User ID cannot be blank" }
+    db.collection("users").document(userId).collection("rentals").document(rentalId.toString()).delete().await()
+  }
+
+  suspend fun fetchRentals(userId: String): Result<List<RentalContractEntity>> = runCatching {
+    require(userId.isNotBlank()) { "User ID cannot be blank" }
+    val snapshot = db.collection("users").document(userId).collection("rentals").get().await()
+    snapshot.documents.mapNotNull { doc ->
+      val title = doc.getString("title") ?: return@mapNotNull null
+      val rentalType = doc.getString("rentalType") ?: "HOUSE"
+      val rentAmount = (doc.get("rentAmount") as? Number)?.toDouble() ?: 0.0
+      val paymentFrequency = doc.getString("paymentFrequency") ?: "MONTHLY"
+      val isWaterIncluded = doc.getBoolean("isWaterIncluded") ?: false
+      val isElectricityIncluded = doc.getBoolean("isElectricityIncluded") ?: false
+      val startDate = (doc.get("startDate") as? Number)?.toLong() ?: System.currentTimeMillis()
+      val durationMonths = (doc.get("durationMonths") as? Number)?.toInt() ?: 12
+      val paidMonths = (doc.get("paidMonths") as? Number)?.toInt() ?: 0
+      val nextDueDate = (doc.get("nextDueDate") as? Number)?.toLong() ?: System.currentTimeMillis()
+      val locationOrPlate = doc.getString("locationOrPlate") ?: ""
+      val notes = doc.getString("notes") ?: ""
+      val id = doc.id.toLongOrNull() ?: 0L
+
+      RentalContractEntity(
+        id = id,
+        title = title,
+        rentalType = rentalType,
+        rentAmount = rentAmount,
+        paymentFrequency = paymentFrequency,
+        isWaterIncluded = isWaterIncluded,
+        isElectricityIncluded = isElectricityIncluded,
+        startDate = startDate,
+        durationMonths = durationMonths,
+        paidMonths = paidMonths,
+        nextDueDate = nextDueDate,
+        locationOrPlate = locationOrPlate,
+        notes = notes
+      )
+    }
+  }
+
+  suspend fun deleteCarLoan(userId: String): Result<Unit> = runCatching {
+    require(userId.isNotBlank()) { "User ID cannot be blank" }
+    db.collection("users").document(userId).collection("car_loan").document("1").delete().await()
   }
 
   suspend fun clearAllUserData(userId: String): Result<Unit> = runCatching {
     require(userId.isNotBlank()) { "User ID cannot be blank" }
-    val collections = listOf("expenses", "installments", "savings_goals", "incomes")
+    val collections = listOf("expenses", "installments", "savings_goals", "incomes", "rentals", "car_loan", "budget")
     for (coll in collections) {
       val colRef = db.collection("users").document(userId).collection(coll)
       val snapshot = colRef.get().await()

@@ -77,6 +77,7 @@ fun CarScreen(
   var selectedSubTab by remember { mutableIntStateOf(0) } // 0: Financing, 1: After-Sales Services
   var showEditLoanDialog by remember { mutableStateOf(false) }
   var showAddServiceDialog by remember { mutableStateOf(false) }
+  var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
   val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale(language.code))
 
@@ -106,7 +107,8 @@ fun CarScreen(
         CarFinancingTab(
           carLoan = carLoan,
           language = language,
-          onEditClick = { showEditLoanDialog = true }
+          onEditClick = { showEditLoanDialog = true },
+          onDeleteClick = { showDeleteConfirmDialog = true }
         )
       } else {
         // Tab 2: After-Sales & Maintenance
@@ -156,15 +158,113 @@ fun CarScreen(
       }
     )
   }
+
+  if (showDeleteConfirmDialog) {
+    androidx.compose.material3.AlertDialog(
+      onDismissRequest = { showDeleteConfirmDialog = false },
+      icon = {
+        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+      },
+      title = {
+        Text(text = AppStrings.get("delete_car_plan_confirm_title", language), fontWeight = FontWeight.Bold)
+      },
+      text = {
+        Text(text = AppStrings.get("delete_car_plan_confirm_msg", language))
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            showDeleteConfirmDialog = false
+            viewModel.deleteCarLoan()
+          },
+          colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error
+          )
+        ) {
+          Text(AppStrings.get("delete", language), color = MaterialTheme.colorScheme.onError)
+        }
+      },
+      dismissButton = {
+        androidx.compose.material3.TextButton(onClick = { showDeleteConfirmDialog = false }) {
+          Text(AppStrings.get("cancel", language))
+        }
+      }
+    )
+  }
 }
 
 @Composable
 private fun CarFinancingTab(
   carLoan: CarLoanEntity?,
   language: AppLanguage,
-  onEditClick: () -> Unit
+  onEditClick: () -> Unit,
+  onDeleteClick: () -> Unit
 ) {
-  val car = carLoan ?: CarLoanEntity()
+  if (carLoan == null) {
+    Box(
+      modifier = Modifier
+        .fillMaxSize()
+        .padding(24.dp),
+      contentAlignment = Alignment.Center
+    ) {
+      Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+      ) {
+        Column(
+          modifier = Modifier
+            .padding(28.dp)
+            .fillMaxWidth(),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+          Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            modifier = Modifier.size(72.dp)
+          ) {
+            Box(contentAlignment = Alignment.Center) {
+              Icon(
+                imageVector = Icons.Default.DirectionsCar,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(36.dp)
+              )
+            }
+          }
+          Text(
+            text = AppStrings.get("no_car_plan", language),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+          )
+          Text(
+            text = if (language == AppLanguage.ARABIC)
+              "لم تسجل خطة تمويل سيارة بعد. يمكنك إضافة بيانات سيارتك والدفعة الأولى والأخيرة لتتبع الأقساط بدقة."
+            else
+              "No car financing registered yet. You can add your car loan details, down payment, and balloon payment to track installments.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+          )
+          Button(
+            onClick = onEditClick,
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.testTag("add_car_plan_button")
+          ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(AppStrings.get("add_car_plan", language), fontWeight = FontWeight.Bold)
+          }
+        }
+      }
+    }
+    return
+  }
+
+  val car = carLoan
   val principal = (car.totalCarPrice - car.downPayment - car.balloonPayment).coerceAtLeast(0.0)
   val totalProfit = principal * (car.annualProfitRate / 100.0) * (car.termMonths / 12.0)
   val loanProgress = if (car.termMonths > 0) car.paidMonths.toFloat() / car.termMonths.toFloat() else 0f
@@ -226,8 +326,13 @@ private fun CarFinancingTab(
                   color = Color(0xFFBFDBFE).copy(alpha = 0.8f)
                 )
               }
-              IconButton(onClick = onEditClick, modifier = Modifier.testTag("edit_car_loan_button")) {
-                Icon(Icons.Default.Edit, contentDescription = AppStrings.get("edit_car_loan", language), tint = Color.White)
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onEditClick, modifier = Modifier.testTag("edit_car_loan_button")) {
+                  Icon(Icons.Default.Edit, contentDescription = AppStrings.get("edit_car_loan", language), tint = Color.White)
+                }
+                IconButton(onClick = onDeleteClick, modifier = Modifier.testTag("delete_car_loan_button")) {
+                  Icon(Icons.Default.Delete, contentDescription = AppStrings.get("delete_car_plan", language), tint = Color(0xFFFCA5A5))
+                }
               }
             }
 

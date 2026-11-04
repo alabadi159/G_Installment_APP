@@ -31,12 +31,17 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import com.example.ui.dialogs.SetBudgetGoalDialog
+import com.example.ui.viewmodel.BudgetStatus
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
@@ -92,6 +97,7 @@ fun DashboardScreen(
   onNavigateToWallets: () -> Unit,
   onNavigateToCommitments: () -> Unit,
   onNavigateToReports: () -> Unit,
+  onNavigateToRentals: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val language by viewModel.currentLanguage.collectAsState()
@@ -106,12 +112,14 @@ fun DashboardScreen(
   val monthlyBreakdown by viewModel.monthlyBreakdown.collectAsState()
   val isFirestoreSource by viewModel.isFirestoreSource.collectAsState()
   val authUser by viewModel.authUser.collectAsState()
+  val budgetTracking by viewModel.budgetTracking.collectAsState()
 
   var showAddExpenseDialog by remember { mutableStateOf(false) }
   var showAddIncomeDialog by remember { mutableStateOf(false) }
   var showAddInstallmentDialog by remember { mutableStateOf(false) }
   var showResetConfirmDialog by remember { mutableStateOf(false) }
   var resetWipeCloud by remember { mutableStateOf(false) }
+  var showBudgetDialog by remember { mutableStateOf(false) }
 
   val snackbarHostState = remember { SnackbarHostState() }
   val scope = rememberCoroutineScope()
@@ -234,6 +242,210 @@ fun DashboardScreen(
         }
       }
 
+      // Monthly Spending Budget Goal Card with 80% Warning and 100% Exceeded Alert
+      item {
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("budget_goal_card"),
+          shape = RoundedCornerShape(22.dp),
+          colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+          ),
+          elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+          Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Surface(
+                  shape = CircleShape,
+                  color = when (budgetTracking.status) {
+                    BudgetStatus.EXCEEDED_100 -> Color(0xFFEF4444).copy(alpha = 0.15f)
+                    BudgetStatus.WARNING_80 -> Color(0xFFF59E0B).copy(alpha = 0.15f)
+                    else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                  },
+                  modifier = Modifier.size(38.dp)
+                ) {
+                  Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                      imageVector = when (budgetTracking.status) {
+                        BudgetStatus.EXCEEDED_100 -> Icons.Default.Warning
+                        BudgetStatus.WARNING_80 -> Icons.Default.Warning
+                        else -> Icons.Default.Savings
+                      },
+                      contentDescription = null,
+                      tint = when (budgetTracking.status) {
+                        BudgetStatus.EXCEEDED_100 -> Color(0xFFEF4444)
+                        BudgetStatus.WARNING_80 -> Color(0xFFF59E0B)
+                        else -> MaterialTheme.colorScheme.primary
+                      },
+                      modifier = Modifier.size(20.dp)
+                    )
+                  }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                  Text(
+                    text = AppStrings.get("monthly_budget_goal", language),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                  )
+                  Text(
+                    text = AppStrings.get("budget_goal_desc", language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                  )
+                }
+              }
+
+              IconButton(
+                onClick = { showBudgetDialog = true },
+                modifier = Modifier.testTag("edit_budget_button")
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Build,
+                  contentDescription = AppStrings.get("edit_budget_goal", language),
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(20.dp)
+                )
+              }
+            }
+
+            if (budgetTracking.goalAmount <= 0.0) {
+              // Empty / unconfigured budget state
+              Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+              ) {
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                  Text(
+                    text = if (language == AppLanguage.ARABIC) "لم يتم تحديد سقف ميزانية شهري بعد" else "No monthly spending budget set yet",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                  )
+                  Button(
+                    onClick = { showBudgetDialog = true },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.testTag("set_budget_button")
+                  ) {
+                    Text(
+                      text = AppStrings.get("set_budget_goal", language),
+                      style = MaterialTheme.typography.labelMedium,
+                      fontWeight = FontWeight.Bold
+                    )
+                  }
+                }
+              }
+            } else {
+              // Active budget progress
+              val progressRatio = (budgetTracking.spentAmount / budgetTracking.goalAmount).toFloat()
+              val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = progressRatio.coerceIn(0f, 1f),
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 650),
+                label = "budgetProgress"
+              )
+
+              val barColor = when (budgetTracking.status) {
+                BudgetStatus.EXCEEDED_100 -> Color(0xFFEF4444)
+                BudgetStatus.WARNING_80 -> Color(0xFFF59E0B)
+                else -> Color(0xFF10B981)
+              }
+
+              Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.Bottom
+                ) {
+                  Column {
+                    Text(
+                      text = AppStrings.get("budget_spent", language),
+                      style = MaterialTheme.typography.labelSmall,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                      text = "${String.format("%,.0f", budgetTracking.spentAmount)} / ${String.format("%,.0f", budgetTracking.goalAmount)} ${AppStrings.get("currency", language)}",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                      color = MaterialTheme.colorScheme.onSurface
+                    )
+                  }
+
+                  Text(
+                    text = "${String.format("%.0f", progressRatio * 100)}%",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = barColor
+                  )
+                }
+
+                // Progress Bar
+                Surface(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp),
+                  shape = RoundedCornerShape(5.dp),
+                  color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                  Box(
+                    modifier = Modifier
+                      .fillMaxWidth(animatedProgress)
+                      .background(barColor, shape = RoundedCornerShape(5.dp))
+                  )
+                }
+
+                // Status Badge
+                Surface(
+                  shape = RoundedCornerShape(10.dp),
+                  color = barColor.copy(alpha = 0.12f),
+                  modifier = Modifier.fillMaxWidth()
+                ) {
+                  Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Icon(
+                      imageVector = when (budgetTracking.status) {
+                        BudgetStatus.EXCEEDED_100 -> Icons.Default.Warning
+                        BudgetStatus.WARNING_80 -> Icons.Default.Warning
+                        else -> Icons.Default.CheckCircle
+                      },
+                      contentDescription = null,
+                      tint = barColor,
+                      modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                      text = when (budgetTracking.status) {
+                        BudgetStatus.EXCEEDED_100 -> AppStrings.get("budget_status_exceeded", language)
+                        BudgetStatus.WARNING_80 -> AppStrings.get("budget_status_warning", language)
+                        else -> "${AppStrings.get("budget_status_safe", language)} (${AppStrings.get("budget_remaining", language)}: ${String.format("%,.0f", budgetTracking.remainingAmount)} ${AppStrings.get("currency", language)})"
+                      },
+                      style = MaterialTheme.typography.labelSmall,
+                      fontWeight = FontWeight.SemiBold,
+                      color = barColor
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Quick Action Buttons
       item {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -269,11 +481,11 @@ fun DashboardScreen(
               modifier = Modifier.weight(1f).testTag("quick_add_installment")
             )
             QuickActionButton(
-              title = AppStrings.get("reports", language),
-              icon = Icons.Default.BarChart,
-              color = Color(0xFF3B82F6),
-              onClick = onNavigateToReports,
-              modifier = Modifier.weight(1f)
+              title = AppStrings.get("rentals_title", language),
+              icon = Icons.Default.Business,
+              color = Color(0xFF0D9488),
+              onClick = onNavigateToRentals,
+              modifier = Modifier.weight(1f).testTag("quick_rentals")
             )
           }
         }
@@ -658,6 +870,18 @@ fun DashboardScreen(
         TextButton(onClick = { showResetConfirmDialog = false }) {
           Text(text = AppStrings.get("cancel", language))
         }
+      }
+    )
+  }
+
+  if (showBudgetDialog) {
+    SetBudgetGoalDialog(
+      currentGoal = budgetTracking.goalAmount,
+      language = language,
+      onDismiss = { showBudgetDialog = false },
+      onConfirm = { goal ->
+        viewModel.updateBudgetGoal(goal)
+        showBudgetDialog = false
       }
     )
   }

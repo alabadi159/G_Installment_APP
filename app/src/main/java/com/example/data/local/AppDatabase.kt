@@ -14,6 +14,8 @@ import com.example.data.local.entity.GoldHoldingEntity
 import com.example.data.local.entity.HousingEntity
 import com.example.data.local.entity.IncomeEntity
 import com.example.data.local.entity.InstallmentPlanEntity
+import com.example.data.local.entity.MonthlyBudgetEntity
+import com.example.data.local.entity.RentalContractEntity
 import com.example.data.local.entity.SavingsGoalEntity
 import com.example.data.local.entity.TelecomContractEntity
 import kotlinx.coroutines.CoroutineScope
@@ -31,9 +33,11 @@ import kotlinx.coroutines.launch
     GoldHoldingEntity::class,
     SavingsGoalEntity::class,
     TelecomContractEntity::class,
-    HousingEntity::class
+    HousingEntity::class,
+    RentalContractEntity::class,
+    MonthlyBudgetEntity::class
   ],
-  version = 3,
+  version = 4,
   exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

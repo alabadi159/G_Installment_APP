@@ -8,6 +8,8 @@ import com.example.data.local.entity.GoldHoldingEntity
 import com.example.data.local.entity.HousingEntity
 import com.example.data.local.entity.IncomeEntity
 import com.example.data.local.entity.InstallmentPlanEntity
+import com.example.data.local.entity.MonthlyBudgetEntity
+import com.example.data.local.entity.RentalContractEntity
 import com.example.data.local.entity.SavingsGoalEntity
 import com.example.data.local.entity.TelecomContractEntity
 import com.example.data.remote.GoldPriceService
@@ -40,6 +42,8 @@ class FinanceRepository(
   val allSavingsGoals: Flow<List<SavingsGoalEntity>> = appDao.getAllSavingsGoals()
   val allTelecomContracts: Flow<List<TelecomContractEntity>> = appDao.getAllTelecomContracts()
   val housing: Flow<HousingEntity?> = appDao.getHousing()
+  val allRentals: Flow<List<RentalContractEntity>> = appDao.getAllRentals()
+  val monthlyBudget: Flow<MonthlyBudgetEntity?> = appDao.getMonthlyBudget()
 
   // Live Gold Rates State
   private val _goldRates = MutableStateFlow(
@@ -342,16 +346,7 @@ class FinanceRepository(
   }
 
   suspend fun clearAllData() {
-    appDao.deleteAllExpenses()
-    appDao.deleteAllIncomes()
-    appDao.deleteAllAlerts()
-    appDao.deleteAllInstallments()
-    appDao.deleteCarLoan()
-    appDao.deleteAllCarServices()
-    appDao.deleteAllGoldHoldings()
-    appDao.deleteAllSavingsGoals()
-    appDao.deleteAllTelecomContracts()
-    appDao.deleteHousing()
+    appDao.clearAllData()
   }
 
   // Cloud Synchronization Methods
@@ -362,7 +357,10 @@ class FinanceRepository(
       val installments = allInstallments.first()
       val savings = allSavingsGoals.first()
       val incomes = allIncomes.first()
+      val rentals = allRentals.first()
       fm.uploadAllToCloud(userId, expenses, installments, savings, incomes)
+      rentals.forEach { fm.saveRental(userId, it) }
+      Result.success(Unit)
     } catch (e: Exception) {
       Result.failure(e)
     }
@@ -381,6 +379,7 @@ class FinanceRepository(
       payload.installments.forEach { appDao.insertInstallment(it); count++ }
       payload.savingsGoals.forEach { appDao.insertSavingsGoal(it); count++ }
       payload.incomes.forEach { appDao.insertIncome(it); count++ }
+      payload.rentals.forEach { appDao.insertRental(it); count++ }
       Result.success(count)
     } catch (e: Exception) {
       Result.failure(e)
@@ -425,6 +424,41 @@ class FinanceRepository(
   suspend fun deleteIncomeFromCloud(userId: String?, incomeId: Long) {
     if (userId.isNullOrBlank() || firestoreManager == null) return
     firestoreManager.deleteIncome(userId, incomeId)
+  }
+
+  // Car Plan Deletion / Reset
+  suspend fun deleteCarLoan(userId: String? = null) {
+    appDao.deleteCarLoan()
+    if (!userId.isNullOrBlank() && firestoreManager != null) {
+      firestoreManager.deleteCarLoan(userId)
+    }
+  }
+
+  // Rental Contracts CRUD
+  suspend fun addRental(rental: RentalContractEntity, userId: String? = null) {
+    val id = appDao.insertRental(rental)
+    if (!userId.isNullOrBlank() && firestoreManager != null) {
+      firestoreManager.saveRental(userId, rental.copy(id = id))
+    }
+  }
+
+  suspend fun updateRental(rental: RentalContractEntity, userId: String? = null) {
+    appDao.updateRental(rental)
+    if (!userId.isNullOrBlank() && firestoreManager != null) {
+      firestoreManager.saveRental(userId, rental)
+    }
+  }
+
+  suspend fun deleteRental(rental: RentalContractEntity, userId: String? = null) {
+    appDao.deleteRental(rental)
+    if (!userId.isNullOrBlank() && firestoreManager != null) {
+      firestoreManager.deleteRental(userId, rental.id)
+    }
+  }
+
+  // Monthly Budget Goal
+  suspend fun saveMonthlyBudget(budget: MonthlyBudgetEntity) {
+    appDao.saveMonthlyBudget(budget)
   }
 
   suspend fun resetAndRebuildDatabase(clearCloud: Boolean = false, userId: String? = null): Result<Unit> = runCatching {

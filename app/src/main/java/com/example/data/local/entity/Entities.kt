@@ -133,3 +133,28 @@ data class HousingEntity(
   val nextDueDate: Long = System.currentTimeMillis() + (20L * 24 * 60 * 60 * 1000),
   val notes: String = ""
 )
+
+@Entity(tableName = "rental_contracts")
+data class RentalContractEntity(
+  @PrimaryKey(autoGenerate = true) val id: Long = 0,
+  val title: String,
+  val rentalType: String, // "HOUSE", "STORE", "CAR", "PLACE"
+  val rentAmount: Double,
+  val paymentFrequency: String = "MONTHLY", // "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL"
+  val isWaterIncluded: Boolean = false,
+  val isElectricityIncluded: Boolean = false,
+  val startDate: Long = System.currentTimeMillis(),
+  val durationMonths: Int = 12,
+  val paidMonths: Int = 0,
+  val nextDueDate: Long = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
+  val locationOrPlate: String = "",
+  val notes: String = ""
+)
+
+@Entity(tableName = "monthly_budget")
+data class MonthlyBudgetEntity(
+  @PrimaryKey val id: Long = 1,
+  val targetAmount: Double = 0.0,
+  val warningThresholdPercent: Int = 80,
+  val isAlertEnabled: Boolean = true
+)

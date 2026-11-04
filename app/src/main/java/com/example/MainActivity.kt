@@ -70,6 +70,7 @@ import com.example.ui.screens.CommitmentsScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.IncomeScreen
 import com.example.ui.screens.InstallmentsScreen
+import com.example.ui.screens.RentalsScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.WalletsScreen
 import com.example.ui.theme.MasareefTheme
@@ -105,6 +106,7 @@ fun MainAppContent(viewModel: FinanceViewModel) {
 
   var selectedNavigationIndex by remember { mutableIntStateOf(0) }
   var isShowingAlertsScreen by remember { mutableStateOf(false) }
+  var isShowingRentalsScreen by remember { mutableStateOf(false) }
   var showBackupRestoreDialog by remember { mutableStateOf(false) }
   var showCloudSyncDialog by remember { mutableStateOf(false) }
 
@@ -152,8 +154,11 @@ fun MainAppContent(viewModel: FinanceViewModel) {
     topBar = {
       TopAppBar(
         navigationIcon = {
-          if (isShowingAlertsScreen) {
-            IconButton(onClick = { isShowingAlertsScreen = false }) {
+          if (isShowingAlertsScreen || isShowingRentalsScreen) {
+            IconButton(onClick = {
+              isShowingAlertsScreen = false
+              isShowingRentalsScreen = false
+            }) {
               Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = null,
@@ -165,7 +170,11 @@ fun MainAppContent(viewModel: FinanceViewModel) {
         title = {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              text = if (isShowingAlertsScreen) AppStrings.get("alerts_and_reminders", language) else AppStrings.get("app_name", language),
+              text = when {
+                isShowingAlertsScreen -> AppStrings.get("alerts_and_reminders", language)
+                isShowingRentalsScreen -> AppStrings.get("rentals_title", language)
+                else -> AppStrings.get("app_name", language)
+              },
               style = MaterialTheme.typography.titleLarge,
               fontWeight = FontWeight.ExtraBold,
               color = MaterialTheme.colorScheme.onSurface
@@ -266,7 +275,7 @@ fun MainAppContent(viewModel: FinanceViewModel) {
       )
     },
     bottomBar = {
-      if (!isShowingAlertsScreen) {
+      if (!isShowingAlertsScreen && !isShowingRentalsScreen) {
         NavigationBar(
           containerColor = MaterialTheme.colorScheme.surface,
           modifier = Modifier.testTag("bottom_nav_bar")
@@ -298,6 +307,8 @@ fun MainAppContent(viewModel: FinanceViewModel) {
     ) {
       if (isShowingAlertsScreen) {
         AlertsScreen(viewModel = viewModel, onDismiss = { isShowingAlertsScreen = false })
+      } else if (isShowingRentalsScreen) {
+        RentalsScreen(viewModel = viewModel, onBack = { isShowingRentalsScreen = false })
       } else {
         AnimatedContent(targetState = selectedNavigationIndex, label = "screen_transition") { screenIndex ->
           when (screenIndex) {
@@ -308,7 +319,8 @@ fun MainAppContent(viewModel: FinanceViewModel) {
               onNavigateToCar = { selectedNavigationIndex = 3 },
               onNavigateToWallets = { selectedNavigationIndex = 4 },
               onNavigateToCommitments = { selectedNavigationIndex = 5 },
-              onNavigateToReports = { selectedNavigationIndex = 5 }
+              onNavigateToReports = { selectedNavigationIndex = 5 },
+              onNavigateToRentals = { isShowingRentalsScreen = true }
             )
             1 -> IncomeScreen(viewModel = viewModel)
             2 -> InstallmentsScreen(viewModel = viewModel)
